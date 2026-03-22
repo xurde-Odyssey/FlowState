@@ -33,6 +33,14 @@ const TAB_META = {
     Explore: { activeIcon: 'compass', inactiveIcon: 'compass-outline' },
     Focus: { activeIcon: 'timer', inactiveIcon: 'timer-outline' },
 };
+const linking = {
+    prefixes: ['habittracker://'],
+    config: {
+        screens: {
+            DecisionWheel: 'decision-wheel',
+        },
+    },
+};
 
 function TabNavigator() {
     const { theme } = useTheme();
@@ -112,7 +120,7 @@ export default function AppNavigator() {
     }
 
     return (
-        <NavigationContainer>
+        <NavigationContainer linking={linking}>
             <Stack.Navigator
                 initialRouteName={initialRoute}
                 screenOptions={{

@@ -1,8 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
-    android:minWidth="220dp"
-    android:minHeight="110dp"
+    android:minWidth="180dp"
+    android:minHeight="120dp"
     android:updatePeriodMillis="1800000"
     android:initialLayout="@layout/habit_widget"
+    android:label="@string/widget_today_momentum"
     android:widgetCategory="home_screen"
     android:resizeMode="horizontal|vertical" />

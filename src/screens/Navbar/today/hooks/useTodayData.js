@@ -162,12 +162,22 @@ export function useTodayData({ playSuccessChime }) {
     }, [fetchQuote]);
 
     useEffect(() => {
-        syncHabitsToWidget({ habits, dateStr: currentDateStr });
-    }, [habits, currentDateStr]);
+        syncHabitsToWidget({ habits, projects, dateStr: currentDateStr });
+    }, [habits, projects, currentDateStr]);
 
     useEffect(() => {
-        NotificationService.syncFixedDailyHabitReminders(habits.length > 0).catch(() => null);
-    }, [habits.length]);
+        const syncReminderFromSettings = async () => {
+            const settings = await storage.getSettings();
+            const reminder = settings?.reminderSettings || {};
+            await NotificationService.syncAutoLaunchReminder({
+                enabled: Boolean(reminder.autoLaunchEnabled),
+                hour: reminder.autoLaunchHour ?? 9,
+                minute: reminder.autoLaunchMinute ?? 0,
+            });
+        };
+
+        syncReminderFromSettings().catch(() => null);
+    }, []);
 
     const isCompleted = useCallback((habit) => {
         return habit.completedDates && habit.completedDates.includes(currentDateStr);
@@ -323,7 +333,7 @@ export function useTodayData({ playSuccessChime }) {
 
         Alert.alert(
             'Delete Habit',
-            'Are you sure you want to delete this habit? This action cannot be undone.',
+            'Are you sure you want to delete this habit? You can undo for a few seconds.',
             [
                 { text: 'Cancel', style: 'cancel' },
                 {

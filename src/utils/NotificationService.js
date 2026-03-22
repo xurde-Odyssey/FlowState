@@ -3,6 +3,7 @@ import { Platform } from 'react-native';
 import Constants from 'expo-constants';
 
 const DAILY_HABIT_REMINDER_TYPE = 'habit-daily-fixed';
+const AUTO_LAUNCH_REMINDER_TYPE = 'auto-launch-reminder';
 const DAILY_HABIT_REMINDER_SLOTS = [
     { key: 'morning', hour: 9, minute: 0 },
     { key: 'evening', hour: 18, minute: 0 },
@@ -239,6 +240,50 @@ export const NotificationService = {
                     },
                 });
             }
+        } catch (error) {
+            notificationsAvailable = false;
+        }
+    },
+
+    /**
+     * Sync a single daily "open the app" reminder.
+     * When enabled, it schedules one repeating notification at the given time.
+     * When disabled, it removes existing auto-launch reminders.
+     */
+    async syncAutoLaunchReminder({ enabled, hour = 9, minute = 0 } = {}) {
+        if (!notificationsAvailable) {return;}
+        try {
+            const scheduled = await Notifications.getAllScheduledNotificationsAsync();
+            const existingIds = scheduled
+                .filter((item) => item?.content?.data?.type === AUTO_LAUNCH_REMINDER_TYPE)
+                .map((item) => item.identifier)
+                .filter(Boolean);
+
+            for (const id of existingIds) {
+                await Notifications.cancelScheduledNotificationAsync(id);
+            }
+
+            if (!enabled) {return;}
+
+            const safeHour = Number.isFinite(Number(hour)) ? Math.max(0, Math.min(23, Number(hour))) : 9;
+            const safeMinute = Number.isFinite(Number(minute)) ? Math.max(0, Math.min(59, Number(minute))) : 0;
+
+            await Notifications.scheduleNotificationAsync({
+                content: {
+                    title: 'Flow State Reminder',
+                    body: 'It is your check-in time. Open Flow State and continue your streak.',
+                    data: {
+                        type: AUTO_LAUNCH_REMINDER_TYPE,
+                        destination: 'Today',
+                    },
+                    sound: true,
+                },
+                trigger: {
+                    hour: safeHour,
+                    minute: safeMinute,
+                    repeats: true,
+                },
+            });
         } catch (error) {
             notificationsAvailable = false;
         }

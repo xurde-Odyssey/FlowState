@@ -20,6 +20,7 @@ import Constants from 'expo-constants';
 import { useTheme } from '../../context/ThemeContext';
 import { useUser } from '../../context/UserContext';
 import { storage } from '../../utils/storage';
+import { NotificationService } from '../../utils/NotificationService';
 
 const getAgeFromBirthDate = (birthDateValue) => {
     if (!birthDateValue) {return null;}
@@ -79,9 +80,12 @@ export default function SettingsScreen() {
     const [expandedAboutSection, setExpandedAboutSection] = useState(ABOUT_SECTIONS[0].key);
     const [profileSaveState, setProfileSaveState] = useState('idle');
     const [themeSaveState, setThemeSaveState] = useState('idle');
+    const [autoLaunchReminderEnabled, setAutoLaunchReminderEnabled] = useState(false);
+    const [reminderSaveState, setReminderSaveState] = useState('idle');
     const exportInputRef = useRef(null);
     const profileSaveTimerRef = useRef(null);
     const themeSaveTimerRef = useRef(null);
+    const reminderSaveTimerRef = useRef(null);
 
     const isWide = width >= 920;
     const appVersion = Constants.expoConfig?.version || Constants.nativeAppVersion || '1.0.0';
@@ -113,6 +117,30 @@ export default function SettingsScreen() {
             if (themeSaveTimerRef.current) {
                 clearTimeout(themeSaveTimerRef.current);
             }
+            if (reminderSaveTimerRef.current) {
+                clearTimeout(reminderSaveTimerRef.current);
+            }
+        };
+    }, []);
+
+    useEffect(() => {
+        let active = true;
+        const loadReminderSetting = async () => {
+            try {
+                const settings = await storage.getSettings();
+                const enabled = Boolean(settings?.reminderSettings?.autoLaunchEnabled);
+                if (active) {
+                    setAutoLaunchReminderEnabled(enabled);
+                }
+            } catch {
+                if (active) {
+                    setAutoLaunchReminderEnabled(false);
+                }
+            }
+        };
+        loadReminderSetting();
+        return () => {
+            active = false;
         };
     }, []);
 
@@ -165,6 +193,44 @@ export default function SettingsScreen() {
             queueSavedState(setThemeSaveState, themeSaveTimerRef);
         } catch (error) {
             setThemeSaveState('error');
+        }
+    };
+
+    const handleToggleAutoLaunchReminder = async (value) => {
+        if (reminderSaveState === 'saving') {return;}
+        try {
+            setReminderSaveState('saving');
+
+            if (value) {
+                const granted = await NotificationService.requestPermissions();
+                if (!granted) {
+                    setAutoLaunchReminderEnabled(false);
+                    setReminderSaveState('error');
+                    Alert.alert('Permission needed', 'Please allow notifications to use Auto Launch Reminder.');
+                    return;
+                }
+            }
+
+            setAutoLaunchReminderEnabled(value);
+            await storage.updateSettings((settings = {}) => ({
+                ...settings,
+                reminderSettings: {
+                    ...(settings.reminderSettings || {}),
+                    autoLaunchEnabled: value,
+                    autoLaunchHour: 9,
+                    autoLaunchMinute: 0,
+                },
+            }));
+
+            await NotificationService.syncAutoLaunchReminder({
+                enabled: value,
+                hour: 9,
+                minute: 0,
+            });
+
+            queueSavedState(setReminderSaveState, reminderSaveTimerRef);
+        } catch (error) {
+            setReminderSaveState('error');
         }
     };
 
@@ -375,6 +441,47 @@ export default function SettingsScreen() {
                             {themeSaveState === 'saving'
                                 ? 'Saving theme...'
                                 : (themeSaveState === 'saved' ? 'Theme saved' : 'Could not save theme')}
+                        </Text>
+                    ) : null}
+                </View>
+
+                <View style={[styles.sectionCard, { backgroundColor: theme.card, borderColor: theme.border }]}> 
+                    <Text style={[styles.sectionTitle, { color: theme.text }]}>Smart Reminder</Text>
+                    <View style={[styles.infoRowBox, { backgroundColor: theme.input, borderColor: theme.border }]}>
+                        <View style={styles.settingLeft}>
+                            <View style={[styles.settingIcon, { backgroundColor: theme.background }]}>
+                                <Ionicons name="alarm-outline" size={18} color={theme.primary} />
+                            </View>
+                            <View>
+                                <Text style={[styles.settingTitle, { color: theme.text }]}>Auto Launch Reminder</Text>
+                                <Text style={[styles.settingSub, { color: theme.subText }]}>
+                                    Daily reminder at 9:00 AM
+                                </Text>
+                            </View>
+                        </View>
+                        <Switch
+                            trackColor={{ false: '#94A3B8', true: theme.primary }}
+                            thumbColor={Platform.OS === 'ios' ? '#FFFFFF' : '#F8FAFC'}
+                            ios_backgroundColor="#64748B"
+                            onValueChange={handleToggleAutoLaunchReminder}
+                            value={autoLaunchReminderEnabled}
+                            disabled={reminderSaveState === 'saving'}
+                        />
+                    </View>
+                    {reminderSaveState !== 'idle' ? (
+                        <Text
+                            style={[
+                                styles.inlineSaveText,
+                                {
+                                    color: reminderSaveState === 'error'
+                                        ? theme.danger
+                                        : (reminderSaveState === 'saved' ? theme.success : theme.subText),
+                                },
+                            ]}
+                        >
+                            {reminderSaveState === 'saving'
+                                ? 'Saving reminder...'
+                                : (reminderSaveState === 'saved' ? 'Reminder updated' : 'Could not update reminder')}
                         </Text>
                     ) : null}
                 </View>
