@@ -1,5 +1,5 @@
 import React from 'react';
-import { ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import LottieView from '../../components/LottieCompat';
@@ -125,6 +125,9 @@ export default function TodayScreen() {
                         onOpenSidebar={openSidebar}
                         onOpenSettings={() => navigation.navigate('Settings')}
                         onRetryQuote={fetchQuote}
+                        onOpenDecisionWheel={() => navigation.navigate('DecisionWheel')}
+                        onOpenNews={() => navigation.navigate('News')}
+                        onOpenShareMarket={() => navigation.navigate('Market')}
                     />
 
                     <ProjectsSection
@@ -429,8 +432,7 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
     },
     greetingContainer: {
-        paddingHorizontal: 24,
-        marginBottom: 28,
+        marginBottom: 18,
     },
     greetingEyebrow: {
         fontSize: 12,
@@ -453,12 +455,11 @@ const styles = StyleSheet.create({
         opacity: 0.78,
     },
     quoteContainer: {
-        paddingHorizontal: 24,
-        marginBottom: 32,
+        marginBottom: 12,
     },
     quoteCard: {
-        padding: 24,
-        borderRadius: 30,
+        padding: 18,
+        borderRadius: 22,
         shadowOffset: { width: 0, height: 15 },
         shadowOpacity: 0.12,
         shadowRadius: 25,
@@ -480,15 +481,56 @@ const styles = StyleSheet.create({
         alignSelf: 'flex-end',
         opacity: 0.8,
     },
+    headerOverviewCard: {
+        marginHorizontal: 24,
+        marginBottom: 30,
+        borderRadius: 30,
+        borderWidth: 1,
+        padding: 18,
+        shadowOffset: { width: 0, height: 12 },
+        shadowOpacity: 0.1,
+        shadowRadius: 24,
+        elevation: 5,
+    },
+    quickAccessContainer: {
+        marginBottom: 12,
+    },
+    quickAccessRow: {
+        flexDirection: 'row',
+        gap: 10,
+    },
+    quickAccessButton: {
+        flex: 1,
+        minHeight: 74,
+        borderRadius: 18,
+        borderWidth: 1,
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingVertical: 10,
+        paddingHorizontal: 8,
+    },
+    quickAccessIconWrap: {
+        width: 30,
+        height: 30,
+        borderRadius: 10,
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginBottom: 8,
+    },
+    quickAccessLabel: {
+        fontSize: 11,
+        fontWeight: '700',
+        textAlign: 'center',
+        lineHeight: 14,
+    },
     calendarStrip: {
-        paddingHorizontal: 24,
-        marginBottom: 32,
+        marginBottom: 0,
     },
     weekContainer: {
         flexDirection: 'row',
         justifyContent: 'space-between',
-        padding: 20,
-        borderRadius: 30,
+        padding: 16,
+        borderRadius: 20,
         shadowOffset: { width: 0, height: 15 },
         shadowOpacity: 0.12,
         shadowRadius: 25,

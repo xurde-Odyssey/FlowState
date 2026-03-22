@@ -33,6 +33,9 @@ export default function TodayHeaderSection({
     onOpenSidebar,
     onOpenSettings,
     onRetryQuote,
+    onOpenDecisionWheel,
+    onOpenNews,
+    onOpenShareMarket,
 }) {
     const triggerTapFeedback = () => {
         Haptics.selectionAsync().catch(() => null);
@@ -76,112 +79,187 @@ export default function TodayHeaderSection({
                 </TouchableOpacity>
             </View>
 
-            <View style={styles.greetingContainer}>
-                <Text style={[styles.greetingEyebrow, { color: theme.subText }]}>
-                    {getTimeGreeting(today)}
-                </Text>
-                <Text style={[styles.greetingName, { color: theme.text }]}>
-                    {userData.name ? userData.name.split(' ')[0] : 'there'}
-                </Text>
-                <Text style={[styles.greetingSupport, { color: theme.subText }]}>
-                    Let's make today meaningful.
-                </Text>
-            </View>
-
-            <View style={styles.quoteContainer}>
-                <View
-                    style={[
-                        styles.quoteCard,
-                        {
-                            backgroundColor: theme.glassBackground,
-                            borderColor: theme.glassBorder,
-                            borderWidth: 1,
-                            shadowColor: theme.shadow,
-                        },
-                    ]}
-                >
-                    {loadingQuote ? (
-                        <ActivityIndicator color={theme.primary} />
-                    ) : quoteError ? (
-                        <View style={styles.quoteErrorWrap}>
-                            <Text style={[styles.quoteErrorText, { color: theme.subText }]}>{quoteError}</Text>
-                            <TouchableOpacity
-                                style={[styles.inlineActionButton, { backgroundColor: theme.primary }]}
-                                onPress={() => {
-                                    triggerTapFeedback();
-                                    onRetryQuote();
-                                }}
-                            >
-                                <Text style={styles.inlineActionText}>Retry</Text>
-                            </TouchableOpacity>
-                        </View>
-                    ) : (
-                        <View>
-                            <Text style={[styles.quoteText, { color: theme.text }]}>"{quote?.q}"</Text>
-                            <Text style={[styles.quoteAuthor, { color: theme.primary, fontWeight: '700' }]}>— {quote?.a}</Text>
-                        </View>
-                    )}
+            <View
+                style={[
+                    styles.headerOverviewCard,
+                    {
+                        backgroundColor: theme.glassBackground,
+                        borderColor: theme.glassBorder,
+                        shadowColor: theme.shadow,
+                    },
+                ]}
+            >
+                <View style={styles.greetingContainer}>
+                    <Text style={[styles.greetingEyebrow, { color: theme.subText }]}>
+                        {getTimeGreeting(today)}
+                    </Text>
+                    <Text style={[styles.greetingName, { color: theme.text }]}>
+                        {userData.name ? userData.name.split(' ')[0] : 'there'}
+                    </Text>
+                    <Text style={[styles.greetingSupport, { color: theme.subText }]}>
+                        Let's make today meaningful.
+                    </Text>
                 </View>
-            </View>
 
-            <View style={styles.calendarStrip}>
-                <View
-                    style={[
-                        styles.weekContainer,
-                        {
-                            backgroundColor: theme.glassBackground,
-                            borderColor: theme.glassBorder,
-                            borderWidth: 1,
-                            shadowColor: theme.shadow,
-                        },
-                    ]}
-                >
-                    {weekDays.map((date, index) => {
-                        const isToday = date.toDateString() === today.toDateString();
-                        const hasActivity = index <= 3;
-                        return (
-                            <TouchableOpacity key={index} style={styles.dayItem} activeOpacity={0.7}>
-                                <Text
-                                    style={[
-                                        styles.dayName,
-                                        {
-                                            color: isToday ? theme.primary : theme.subText,
-                                            fontWeight: isToday ? '900' : '600',
-                                        },
-                                    ]}
+                <View style={styles.quoteContainer}>
+                    <View
+                        style={[
+                            styles.quoteCard,
+                            {
+                                backgroundColor: theme.card,
+                                borderColor: theme.glassBorder,
+                                borderWidth: 1,
+                                shadowColor: theme.shadow,
+                            },
+                        ]}
+                    >
+                        {loadingQuote ? (
+                            <ActivityIndicator color={theme.primary} />
+                        ) : quoteError ? (
+                            <View style={styles.quoteErrorWrap}>
+                                <Text style={[styles.quoteErrorText, { color: theme.subText }]}>{quoteError}</Text>
+                                <TouchableOpacity
+                                    style={[styles.inlineActionButton, { backgroundColor: theme.primary }]}
+                                    onPress={() => {
+                                        triggerTapFeedback();
+                                        onRetryQuote();
+                                    }}
                                 >
-                                    {getDayName(date)}
-                                </Text>
-                                <View
-                                    style={[
-                                        styles.dateCircle,
-                                        isToday && {
-                                            backgroundColor: theme.primary,
-                                            shadowColor: theme.primary,
-                                            shadowOpacity: 0.4,
-                                            shadowRadius: 8,
-                                            elevation: 8,
-                                        },
-                                    ]}
-                                >
-                                    <View
-                                        style={[
-                                            styles.dot,
-                                            { backgroundColor: hasActivity ? (isToday ? 'white' : theme.primary) : 'transparent' },
-                                        ]}
-                                    />
+                                    <Text style={styles.inlineActionText}>Retry</Text>
+                                </TouchableOpacity>
+                            </View>
+                        ) : (
+                            <View>
+                                <Text style={[styles.quoteText, { color: theme.text }]}>"{quote?.q}"</Text>
+                                <Text style={[styles.quoteAuthor, { color: theme.primary, fontWeight: '700' }]}>— {quote?.a}</Text>
+                            </View>
+                        )}
+                    </View>
+                </View>
+
+                <View style={styles.quickAccessContainer}>
+                    <View style={styles.quickAccessRow}>
+                        <TouchableOpacity
+                            style={[
+                                styles.quickAccessButton,
+                                {
+                                    backgroundColor: theme.card,
+                                    borderColor: theme.glassBorder,
+                                },
+                            ]}
+                            onPress={() => {
+                                triggerTapFeedback();
+                                onOpenDecisionWheel();
+                            }}
+                            activeOpacity={0.86}
+                        >
+                            <View style={[styles.quickAccessIconWrap, { backgroundColor: theme.secondary + '22' }]}>
+                                <Ionicons name="shuffle-outline" size={16} color={theme.secondary} />
+                            </View>
+                            <Text style={[styles.quickAccessLabel, { color: theme.text }]}>Decision Wheel</Text>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity
+                            style={[
+                                styles.quickAccessButton,
+                                {
+                                    backgroundColor: theme.card,
+                                    borderColor: theme.glassBorder,
+                                },
+                            ]}
+                            onPress={() => {
+                                triggerTapFeedback();
+                                onOpenNews();
+                            }}
+                            activeOpacity={0.86}
+                        >
+                            <View style={[styles.quickAccessIconWrap, { backgroundColor: theme.primary + '22' }]}>
+                                <Ionicons name="newspaper-outline" size={16} color={theme.primary} />
+                            </View>
+                            <Text style={[styles.quickAccessLabel, { color: theme.text }]}>News</Text>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity
+                            style={[
+                                styles.quickAccessButton,
+                                {
+                                    backgroundColor: theme.card,
+                                    borderColor: theme.glassBorder,
+                                },
+                            ]}
+                            onPress={() => {
+                                triggerTapFeedback();
+                                onOpenShareMarket();
+                            }}
+                            activeOpacity={0.86}
+                        >
+                            <View style={[styles.quickAccessIconWrap, { backgroundColor: theme.success + '22' }]}>
+                                <Ionicons name="bar-chart-outline" size={16} color={theme.success} />
+                            </View>
+                            <Text style={[styles.quickAccessLabel, { color: theme.text }]}>Share Market</Text>
+                        </TouchableOpacity>
+                    </View>
+                </View>
+
+                <View style={styles.calendarStrip}>
+                    <View
+                        style={[
+                            styles.weekContainer,
+                            {
+                                backgroundColor: theme.card,
+                                borderColor: theme.glassBorder,
+                                borderWidth: 1,
+                                shadowColor: theme.shadow,
+                            },
+                        ]}
+                    >
+                        {weekDays.map((date, index) => {
+                            const isToday = date.toDateString() === today.toDateString();
+                            const hasActivity = index <= 3;
+                            return (
+                                <TouchableOpacity key={index} style={styles.dayItem} activeOpacity={0.7}>
                                     <Text
                                         style={[
-                                            styles.dateNumber,
-                                            { color: isToday ? 'white' : theme.text, fontWeight: isToday ? '900' : '600' },
+                                            styles.dayName,
+                                            {
+                                                color: isToday ? theme.primary : theme.subText,
+                                                fontWeight: isToday ? '900' : '600',
+                                            },
                                         ]}
                                     >
-                                        {date.getDate()}
+                                        {getDayName(date)}
                                     </Text>
-                                </View>
-                            </TouchableOpacity>
-                        );
-                    })}
+                                    <View
+                                        style={[
+                                            styles.dateCircle,
+                                            isToday && {
+                                                backgroundColor: theme.primary,
+                                                shadowColor: theme.primary,
+                                                shadowOpacity: 0.4,
+                                                shadowRadius: 8,
+                                                elevation: 8,
+                                            },
+                                        ]}
+                                    >
+                                        <View
+                                            style={[
+                                                styles.dot,
+                                                { backgroundColor: hasActivity ? (isToday ? 'white' : theme.primary) : 'transparent' },
+                                            ]}
+                                        />
+                                        <Text
+                                            style={[
+                                                styles.dateNumber,
+                                                { color: isToday ? 'white' : theme.text, fontWeight: isToday ? '900' : '600' },
+                                            ]}
+                                        >
+                                            {date.getDate()}
+                                        </Text>
+                                    </View>
+                                </TouchableOpacity>
+                            );
+                        })}
+                    </View>
                 </View>
             </View>
         </>

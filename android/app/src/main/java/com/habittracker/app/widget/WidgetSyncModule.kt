@@ -10,11 +10,16 @@ class WidgetSyncModule(reactContext: ReactApplicationContext) : ReactContextBase
 
   @ReactMethod
   fun updateHabits(habitsJson: String, promise: Promise) {
+    updateMomentum(habitsJson, promise)
+  }
+
+  @ReactMethod
+  fun updateMomentum(momentumJson: String, promise: Promise) {
     try {
-      WidgetStore.saveHabitsJson(reactApplicationContext, habitsJson)
+      WidgetStore.saveMomentumJson(reactApplicationContext, momentumJson)
       promise.resolve(true)
     } catch (e: Exception) {
-      promise.reject("WIDGET_SYNC_FAILED", "Could not sync widget habits", e)
+      promise.reject("WIDGET_SYNC_FAILED", "Could not sync widget data", e)
     }
   }
 }

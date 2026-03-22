@@ -6,20 +6,20 @@ import android.content.Context
 
 object WidgetStore {
   private const val PREFS_NAME = "habit_widget_prefs"
-  private const val KEY_HABITS_JSON = "habits_json"
+  private const val KEY_MOMENTUM_JSON = "momentum_json"
 
-  fun saveHabitsJson(context: Context, json: String) {
+  fun saveMomentumJson(context: Context, json: String) {
     context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
       .edit()
-      .putString(KEY_HABITS_JSON, json)
+      .putString(KEY_MOMENTUM_JSON, json)
       .apply()
 
     refreshWidgets(context)
   }
 
-  fun getHabitsJson(context: Context): String {
+  fun getMomentumJson(context: Context): String {
     return context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-      .getString(KEY_HABITS_JSON, "[]") ?: "[]"
+      .getString(KEY_MOMENTUM_JSON, "{}") ?: "{}"
   }
 
   fun refreshWidgets(context: Context) {

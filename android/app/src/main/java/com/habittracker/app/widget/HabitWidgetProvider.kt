@@ -11,6 +11,7 @@ import android.widget.RemoteViews
 import com.habittracker.app.MainActivity
 import com.habittracker.app.R
 import org.json.JSONArray
+import org.json.JSONObject
 
 class HabitWidgetProvider : AppWidgetProvider() {
 
@@ -21,86 +22,101 @@ class HabitWidgetProvider : AppWidgetProvider() {
   }
 
   companion object {
-    private data class WidgetHabit(val id: String, val name: String, val isCompleted: Boolean)
+    private data class PendingItem(val id: String, val type: String, val name: String)
+    private data class MomentumData(
+      val streakDays: Int,
+      val todayScore: Int,
+      val pendingItems: List<PendingItem>
+    )
 
     fun renderWidget(context: Context, appWidgetManager: AppWidgetManager, appWidgetId: Int) {
       val views = RemoteViews(context.packageName, R.layout.habit_widget)
-      val habits = readHabits(context)
-      val activeHabits = habits.filter { !it.isCompleted }.take(3)
-
-      bindRow(context, views, 0, activeHabits.getOrNull(0))
-      bindRow(context, views, 1, activeHabits.getOrNull(1))
-      bindRow(context, views, 2, activeHabits.getOrNull(2))
-
-      if (activeHabits.isEmpty()) {
-        views.setViewVisibility(R.id.widget_empty, View.VISIBLE)
-      } else {
-        views.setViewVisibility(R.id.widget_empty, View.GONE)
+      val data = readMomentum(context)
+      val safeScore = data.todayScore.coerceIn(0, 100)
+      val scoreColor = when {
+        safeScore >= 80 -> 0xFF16A34A.toInt()
+        safeScore >= 40 -> 0xFFF59E0B.toInt()
+        else -> 0xFFDC2626.toInt()
       }
 
-      val openAppIntent = Intent(context, MainActivity::class.java)
-      val openAppPendingIntent = PendingIntent.getActivity(
-        context,
-        9000,
-        openAppIntent,
-        PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-      )
-      views.setOnClickPendingIntent(R.id.widget_title, openAppPendingIntent)
+      views.setTextViewText(R.id.widget_streak, "Streak: ${data.streakDays} days")
+      views.setTextViewText(R.id.widget_score_value, "$safeScore%")
+      views.setInt(R.id.widget_score_ring, "setColorFilter", scoreColor)
+      views.setProgressBar(R.id.widget_score_progress, 100, safeScore, false)
+
+      bindPendingRow(views, R.id.pending_1, data.pendingItems.getOrNull(0))
+      bindPendingRow(views, R.id.pending_2, data.pendingItems.getOrNull(1))
+      bindPendingRow(views, R.id.pending_3, data.pendingItems.getOrNull(2))
+
+      val isEmpty = data.pendingItems.isEmpty()
+      views.setViewVisibility(R.id.widget_empty, if (isEmpty) View.VISIBLE else View.GONE)
+
+      val openHome = deepLinkIntent(context, "habittracker://")
+      views.setOnClickPendingIntent(R.id.widget_header, openHome)
+
+      val addHabitIntent = deepLinkIntent(context, "habittracker://add-habit")
+      views.setOnClickPendingIntent(R.id.action_add_habit, addHabitIntent)
+
+      val topPending = data.pendingItems.firstOrNull()
+      if (topPending != null) {
+        val markDoneUri = "habittracker://complete-item?type=${Uri.encode(topPending.type)}&id=${Uri.encode(topPending.id)}"
+        views.setOnClickPendingIntent(R.id.action_mark_done, deepLinkIntent(context, markDoneUri))
+        views.setTextViewText(R.id.action_mark_done, "Mark Done")
+      } else {
+        views.setOnClickPendingIntent(R.id.action_mark_done, openHome)
+        views.setTextViewText(R.id.action_mark_done, "No Pending")
+      }
+
+      val spinIntent = deepLinkIntent(context, "habittracker://decision-wheel")
+      views.setOnClickPendingIntent(R.id.action_spin, spinIntent)
 
       appWidgetManager.updateAppWidget(appWidgetId, views)
     }
 
-    private fun bindRow(context: Context, views: RemoteViews, rowIndex: Int, habit: WidgetHabit?) {
-      val rowIds = intArrayOf(R.id.row_1, R.id.row_2, R.id.row_3)
-      val titleIds = intArrayOf(R.id.habit_name_1, R.id.habit_name_2, R.id.habit_name_3)
-      val doneIds = intArrayOf(R.id.habit_done_1, R.id.habit_done_2, R.id.habit_done_3)
-
-      val rowId = rowIds[rowIndex]
-      val titleId = titleIds[rowIndex]
-      val doneId = doneIds[rowIndex]
-
-      if (habit == null) {
-        views.setViewVisibility(rowId, View.GONE)
+    private fun bindPendingRow(views: RemoteViews, viewId: Int, item: PendingItem?) {
+      if (item == null) {
+        views.setViewVisibility(viewId, View.GONE)
         return
       }
+      val prefix = if (item.type == "project") "Project" else "Habit"
+      views.setViewVisibility(viewId, View.VISIBLE)
+      views.setTextViewText(viewId, "• $prefix: ${item.name}")
+    }
 
-      views.setViewVisibility(rowId, View.VISIBLE)
-      views.setTextViewText(titleId, habit.name)
-
-      val deepLink = Uri.parse("habittracker://complete-habit?habitId=${Uri.encode(habit.id)}")
+    private fun deepLinkIntent(context: Context, uriString: String): PendingIntent {
+      val deepLink = Uri.parse(uriString)
       val intent = Intent(Intent.ACTION_VIEW, deepLink).apply {
         setClass(context, MainActivity::class.java)
         addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
       }
-
-      val requestCode = (habit.id.hashCode() and 0x7fffffff) + rowIndex
-      val pendingIntent = PendingIntent.getActivity(
+      val requestCode = uriString.hashCode() and 0x7fffffff
+      return PendingIntent.getActivity(
         context,
         requestCode,
         intent,
         PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
       )
-
-      views.setOnClickPendingIntent(doneId, pendingIntent)
-      views.setOnClickPendingIntent(titleId, pendingIntent)
     }
 
-    private fun readHabits(context: Context): List<WidgetHabit> {
+    private fun readMomentum(context: Context): MomentumData {
       return try {
-        val json = WidgetStore.getHabitsJson(context)
-        val arr = JSONArray(json)
-        buildList {
-          for (i in 0 until arr.length()) {
-            val item = arr.optJSONObject(i) ?: continue
+        val root = JSONObject(WidgetStore.getMomentumJson(context))
+        val streakDays = root.optInt("streakDays", 0)
+        val todayScore = root.optInt("todayScore", 0)
+        val pending = root.optJSONArray("pendingItems") ?: JSONArray()
+        val pendingItems = buildList {
+          for (index in 0 until pending.length()) {
+            val item = pending.optJSONObject(index) ?: continue
             val id = item.optString("id", "")
-            if (id.isBlank()) continue
-            val name = item.optString("name", "Habit")
-            val isCompleted = item.optBoolean("isCompleted", false)
-            add(WidgetHabit(id = id, name = name, isCompleted = isCompleted))
+            val type = item.optString("type", "habit")
+            val name = item.optString("name", "Task")
+            if (id.isBlank() || name.isBlank()) {continue}
+            add(PendingItem(id = id, type = type, name = name))
           }
         }
+        MomentumData(streakDays = streakDays, todayScore = todayScore, pendingItems = pendingItems)
       } catch (_: Exception) {
-        emptyList()
+        MomentumData(streakDays = 0, todayScore = 0, pendingItems = emptyList())
       }
     }
   }

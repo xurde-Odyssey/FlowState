@@ -7,6 +7,7 @@ import { UserProvider } from './src/context/UserContext';
 import { TimeProvider } from './src/context/TimeContext';
 import { storage } from './src/utils/storage';
 import { syncHabitsToWidget } from './src/utils/widgetSync';
+import { NotificationService } from './src/utils/NotificationService';
 
 export default function App() {
     const [isStorageReady, setIsStorageReady] = useState(false);
@@ -14,26 +15,71 @@ export default function App() {
     useEffect(() => {
         const bootstrapStorage = async () => {
             await storage.ensureDataMigrated();
+
+            const settings = await storage.getSettings();
+            const reminder = settings?.reminderSettings || {};
+            if (reminder.autoLaunchEnabled) {
+                const granted = await NotificationService.requestPermissions();
+                if (granted) {
+                    await NotificationService.syncAutoLaunchReminder({
+                        enabled: true,
+                        hour: reminder.autoLaunchHour ?? 9,
+                        minute: reminder.autoLaunchMinute ?? 0,
+                    });
+                }
+            }
+
             setIsStorageReady(true);
         };
         bootstrapStorage();
     }, []);
 
     useEffect(() => {
+        const syncWidgetSnapshot = async () => {
+            const today = new Date().toISOString().split('T')[0];
+            const [habits, projects] = await Promise.all([
+                storage.getHabits(),
+                storage.getProjects(),
+            ]);
+            await syncHabitsToWidget({ habits, projects, dateStr: today });
+        };
+
         const handleCompleteHabitUrl = async (url) => {
             if (!url || !url.startsWith('habittracker://')) {return;}
             const normalized = url.replace('habittracker://', '');
             const [route, query = ''] = normalized.split('?');
-            if (route !== 'complete-habit') {return;}
-
             const queryPairs = query.split('&').map((part) => part.split('='));
-            const rawHabitId = queryPairs.find(([key]) => key === 'habitId')?.[1];
-            const habitId = rawHabitId ? decodeURIComponent(rawHabitId) : '';
-            if (!habitId) {return;}
+            const getParam = (key) => {
+                const raw = queryPairs.find(([k]) => k === key)?.[1];
+                return raw ? decodeURIComponent(raw) : '';
+            };
 
-            const updatedHabits = await storage.setHabitCompletion(habitId, true);
-            const today = new Date().toISOString().split('T')[0];
-            await syncHabitsToWidget({ habits: updatedHabits, dateStr: today });
+            if (route === 'complete-habit') {
+                const habitId = getParam('habitId');
+                if (!habitId) {return;}
+                await storage.setHabitCompletion(habitId, true);
+                await syncWidgetSnapshot();
+                return;
+            }
+
+            if (route === 'add-habit') {
+                await storage.addHabit({ name: 'New Habit', frequency: 'Daily', priority: 'Medium', category: 'Personal' });
+                await syncWidgetSnapshot();
+                return;
+            }
+
+            if (route === 'complete-item') {
+                const itemType = getParam('type');
+                const itemId = getParam('id');
+                if (!itemId) {return;}
+
+                if (itemType === 'project') {
+                    await storage.deleteProject(itemId);
+                } else {
+                    await storage.setHabitCompletion(itemId, true);
+                }
+                await syncWidgetSnapshot();
+            }
         };
 
         Linking.getInitialURL().then((url) => {

@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
     Alert,
     Animated,
+    Image,
     Easing,
     KeyboardAvoidingView,
     Modal,
@@ -15,7 +16,7 @@ import {
     useWindowDimensions,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import Svg, { G, Path, Text as SvgText } from 'react-native-svg';
+import Svg, { Circle, G, Path, Text as SvgText } from 'react-native-svg';
 import { Ionicons } from '@expo/vector-icons';
 import { Audio } from 'expo-av';
 import { useTheme } from '../../context/ThemeContext';
@@ -131,7 +132,7 @@ export default function DecisionWheelScreen() {
 
     const wheelSize = clamp(Math.floor(Math.min(width, height) * 0.7), 240, 360);
     const radius = wheelSize / 2;
-    const innerRadius = Math.max(40, Math.floor(radius * 0.32));
+    const innerRadius = 11;
     const labelRadius = Math.max(82, Math.floor(radius * 0.66));
     const entriesBoxHeight = clamp(Math.floor(height * 0.13), 78, 104);
 
@@ -398,39 +399,59 @@ export default function DecisionWheelScreen() {
                     disabled={isSpinning}
                     activeOpacity={0.9}
                 >
-                    <View style={styles.pointerArrow}>
-                        <View style={styles.pointerHead} />
-                        <View style={styles.pointerShaft} />
-                    </View>
+                    <Image
+                        source={require('../../../assets/wheel-pointer.png')}
+                        style={styles.pointerImage}
+                        resizeMode="contain"
+                    />
                     <Animated.View style={[styles.wheelInner, { transform: [{ rotate: wheelRotate }] }]}>
                         <Svg width={wheelSize} height={wheelSize}>
                             <G>
-                                {options.map((option, index) => {
-                                    const startAngle = index * segmentAngle - 90;
-                                    const endAngle = (index + 1) * segmentAngle - 90;
-                                    const midAngle = startAngle + segmentAngle / 2;
-                                    const path = buildArcPath(radius, radius, radius - 3, innerRadius, startAngle, endAngle);
-                                    const labelPos = polarToCartesian(radius, radius, labelRadius, midAngle);
-                                    const maxLen = options.length > 8 ? 8 : 12;
-                                    const label = option.label.length > maxLen ? `${option.label.slice(0, maxLen)}...` : option.label;
+                                {options.length === 0 ? (
+                                    <>
+                                        <Circle
+                                            cx={radius}
+                                            cy={radius}
+                                            r={radius - 3}
+                                            fill="#F7EFD8"
+                                            stroke={theme.card}
+                                            strokeWidth={2}
+                                        />
+                                        <Circle
+                                            cx={radius}
+                                            cy={radius}
+                                            r={innerRadius}
+                                            fill={theme.background}
+                                        />
+                                    </>
+                                ) : (
+                                    options.map((option, index) => {
+                                        const startAngle = index * segmentAngle - 90;
+                                        const endAngle = (index + 1) * segmentAngle - 90;
+                                        const midAngle = startAngle + segmentAngle / 2;
+                                        const path = buildArcPath(radius, radius, radius - 3, innerRadius, startAngle, endAngle);
+                                        const labelPos = polarToCartesian(radius, radius, labelRadius, midAngle);
+                                        const maxLen = options.length > 8 ? 8 : 12;
+                                        const label = option.label.length > maxLen ? `${option.label.slice(0, maxLen)}...` : option.label;
 
-                                    return (
-                                        <G key={option.id}>
-                                            <Path d={path} fill={option.color} stroke={theme.card} strokeWidth={2} />
-                                            <SvgText
-                                                x={labelPos.x}
-                                                y={labelPos.y}
-                                                fill="#FFFFFF"
-                                                fontSize={options.length > 8 ? '10' : '12'}
-                                                fontWeight="700"
-                                                textAnchor="middle"
-                                                alignmentBaseline="middle"
-                                            >
-                                                {label}
-                                            </SvgText>
-                                        </G>
-                                    );
-                                })}
+                                        return (
+                                            <G key={option.id}>
+                                                <Path d={path} fill={option.color} stroke={theme.card} strokeWidth={2} />
+                                                <SvgText
+                                                    x={labelPos.x}
+                                                    y={labelPos.y}
+                                                    fill="#FFFFFF"
+                                                    fontSize={options.length > 8 ? '10' : '12'}
+                                                    fontWeight="700"
+                                                    textAnchor="middle"
+                                                    alignmentBaseline="middle"
+                                                >
+                                                    {label}
+                                                </SvgText>
+                                            </G>
+                                        );
+                                    })
+                                )}
                             </G>
                         </Svg>
                     </Animated.View>
@@ -582,35 +603,15 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'center',
     },
-    pointerArrow: {
+    pointerImage: {
         position: 'absolute',
-        right: -31,
+        right: -50,
         top: '50%',
-        marginTop: -12,
-        flexDirection: 'row',
-        alignItems: 'center',
+        marginTop: -30,
+        width: 78,
+        height: 60,
         zIndex: 6,
-        shadowColor: '#000',
-        shadowOpacity: 0.24,
-        shadowOffset: { width: 0, height: 2 },
-        shadowRadius: 4,
-        elevation: 6,
-    },
-    pointerShaft: {
-        width: 20,
-        height: 8,
-        borderRadius: 4,
-        backgroundColor: '#111111',
-    },
-    pointerHead: {
-        width: 0,
-        height: 0,
-        borderTopWidth: 12,
-        borderBottomWidth: 12,
-        borderRightWidth: 22,
-        borderTopColor: 'transparent',
-        borderBottomColor: 'transparent',
-        borderRightColor: '#111111',
+        transform: [{ rotate: '90deg' }],
     },
     centerHubDot: {
         position: 'absolute',
