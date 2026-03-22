@@ -22,10 +22,13 @@ export function useTodayData({ playSuccessChime }) {
     const [habits, setHabits] = useState([]);
     const [today, setToday] = useState(new Date());
     const [projects, setProjects] = useState([]);
+    const [todoItems, setTodoItems] = useState([]);
     const [loadingHabits, setLoadingHabits] = useState(false);
     const [loadingProjects, setLoadingProjects] = useState(false);
+    const [loadingTodos, setLoadingTodos] = useState(false);
     const [habitsError, setHabitsError] = useState(null);
     const [projectsError, setProjectsError] = useState(null);
+    const [todoError, setTodoError] = useState(null);
 
     const [quote, setQuote] = useState(null);
     const [loadingQuote, setLoadingQuote] = useState(true);
@@ -91,6 +94,20 @@ export function useTodayData({ playSuccessChime }) {
         }
     }, []);
 
+    const loadTodos = useCallback(async () => {
+        setLoadingTodos(true);
+        setTodoError(null);
+        try {
+            const storedTodos = await storage.getTodoItems();
+            setTodoItems(storedTodos);
+        } catch (error) {
+            setTodoError('Could not load todo list right now.');
+            setTodoItems([]);
+        } finally {
+            setLoadingTodos(false);
+        }
+    }, []);
+
     const loadLifeWidget = useCallback(async () => {
         try {
             const settings = await storage.getSettings();
@@ -152,9 +169,10 @@ export function useTodayData({ playSuccessChime }) {
         useCallback(() => {
             loadHabits();
             loadProjects();
+            loadTodos();
             loadLifeWidget();
             setToday(new Date());
-        }, [loadHabits, loadProjects, loadLifeWidget])
+        }, [loadHabits, loadProjects, loadTodos, loadLifeWidget])
     );
 
     useEffect(() => {
@@ -472,6 +490,59 @@ export function useTodayData({ playSuccessChime }) {
         }
     }, []);
 
+    const addTodoItem = useCallback(async (title) => {
+        const cleanedTitle = (title || '').trim();
+        if (!cleanedTitle) {return false;}
+        try {
+            setTodoError(null);
+            const updatedTodos = await storage.addTodoItem(cleanedTitle);
+            setTodoItems(updatedTodos);
+            Haptics.selectionAsync().catch(() => null);
+            return true;
+        } catch (error) {
+            setTodoError('Could not save this todo.');
+            return false;
+        }
+    }, []);
+
+    const toggleTodoItem = useCallback(async (id) => {
+        if (!id) {return;}
+        try {
+            setTodoError(null);
+            const updatedTodos = await storage.toggleTodoItem(id);
+            setTodoItems(updatedTodos);
+            Haptics.selectionAsync().catch(() => null);
+        } catch (error) {
+            setTodoError('Could not update this todo.');
+        }
+    }, []);
+
+    const updateTodoItem = useCallback(async (id, title) => {
+        const cleanedTitle = (title || '').trim();
+        if (!id || !cleanedTitle) {return false;}
+        try {
+            setTodoError(null);
+            const updatedTodos = await storage.updateTodoItem(id, { title: cleanedTitle });
+            setTodoItems(updatedTodos);
+            Haptics.selectionAsync().catch(() => null);
+            return true;
+        } catch (error) {
+            setTodoError('Could not update this todo.');
+            return false;
+        }
+    }, []);
+
+    const deleteTodoItem = useCallback(async (id) => {
+        if (!id) {return;}
+        try {
+            setTodoError(null);
+            const updatedTodos = await storage.deleteTodoItem(id);
+            setTodoItems(updatedTodos);
+        } catch (error) {
+            setTodoError('Could not delete this todo.');
+        }
+    }, []);
+
     const calculateDaysLeft = useCallback((project) => {
         const createdDate = new Date(project.createdAt);
         const deadlineDate = new Date(createdDate);
@@ -492,10 +563,13 @@ export function useTodayData({ playSuccessChime }) {
         habits,
         today,
         projects,
+        todoItems,
         loadingHabits,
         loadingProjects,
+        loadingTodos,
         habitsError,
         projectsError,
+        todoError,
         quote,
         loadingQuote,
         quoteError,
@@ -537,6 +611,7 @@ export function useTodayData({ playSuccessChime }) {
         closeHabitModal,
         loadHabits,
         loadProjects,
+        loadTodos,
         fetchQuote,
         openEditModal,
         toggleHabit,
@@ -552,5 +627,10 @@ export function useTodayData({ playSuccessChime }) {
         handleDeleteProject,
         calculateDaysLeft,
         getDaysLeftColor,
+
+        addTodoItem,
+        toggleTodoItem,
+        updateTodoItem,
+        deleteTodoItem,
     };
 }

@@ -10,6 +10,7 @@ import { useTime } from '../../context/TimeContext';
 import { useTodayData } from './today/hooks/useTodayData';
 import { useSidebarDrawer } from './today/hooks/useSidebarDrawer';
 import TodayHeaderSection from './today/components/TodayHeaderSection';
+import TodoListSection from './today/components/TodoListSection';
 import ProjectsSection from './today/components/ProjectsSection';
 import HabitsSection from './today/components/HabitsSection';
 import TodayModals from './today/components/TodayModals';
@@ -27,10 +28,13 @@ export default function TodayScreen() {
         habits,
         today,
         projects,
+        todoItems,
         loadingHabits,
         loadingProjects,
+        loadingTodos,
         habitsError,
         projectsError,
+        todoError,
         quote,
         loadingQuote,
         quoteError,
@@ -77,6 +81,7 @@ export default function TodayScreen() {
 
         loadHabits,
         loadProjects,
+        loadTodos,
         fetchQuote,
         openCreateProjectModal,
         closeProjectModal,
@@ -86,6 +91,10 @@ export default function TodayScreen() {
         handleDeleteProject,
         calculateDaysLeft,
         getDaysLeftColor,
+        addTodoItem,
+        toggleTodoItem,
+        updateTodoItem,
+        deleteTodoItem,
     } = useTodayData({ playSuccessChime });
 
     const {
@@ -128,6 +137,19 @@ export default function TodayScreen() {
                         onOpenDecisionWheel={() => navigation.navigate('DecisionWheel')}
                         onOpenNews={() => navigation.navigate('News')}
                         onOpenShareMarket={() => navigation.navigate('Market')}
+                    />
+
+                    <TodoListSection
+                        styles={styles}
+                        theme={theme}
+                        todoItems={todoItems}
+                        loadingTodos={loadingTodos}
+                        todoError={todoError}
+                        onRetryLoadTodos={loadTodos}
+                        onAddTodo={addTodoItem}
+                        onToggleTodo={toggleTodoItem}
+                        onUpdateTodo={updateTodoItem}
+                        onDeleteTodo={deleteTodoItem}
                     />
 
                     <ProjectsSection
@@ -566,6 +588,124 @@ const styles = StyleSheet.create({
         paddingHorizontal: 24,
         marginBottom: 32,
     },
+    todoComposer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        borderWidth: 1,
+        borderRadius: 22,
+        paddingLeft: 16,
+        paddingRight: 10,
+        paddingVertical: 10,
+        marginBottom: 14,
+        shadowOffset: { width: 0, height: 10 },
+        shadowOpacity: 0.07,
+        shadowRadius: 18,
+        elevation: 3,
+    },
+    todoInput: {
+        flex: 1,
+        fontSize: 15,
+        fontWeight: '600',
+        paddingVertical: 4,
+        paddingRight: 12,
+    },
+    todoAddButton: {
+        width: 38,
+        height: 38,
+        borderRadius: 13,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    todoCountBadge: {
+        fontSize: 11,
+        fontWeight: '800',
+        paddingHorizontal: 10,
+        paddingVertical: 6,
+        borderRadius: 999,
+        textTransform: 'uppercase',
+        letterSpacing: 0.3,
+    },
+    todoEmptyCard: {
+        borderWidth: 1,
+        borderRadius: 20,
+        paddingHorizontal: 18,
+        paddingVertical: 20,
+        alignItems: 'center',
+    },
+    todoEmptyTitle: {
+        fontSize: 16,
+        fontWeight: '800',
+        marginBottom: 4,
+    },
+    todoEmptyText: {
+        fontSize: 13,
+        fontWeight: '500',
+        textAlign: 'center',
+        lineHeight: 19,
+    },
+    todoCard: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        borderWidth: 1,
+        borderRadius: 20,
+        paddingHorizontal: 14,
+        paddingVertical: 14,
+        marginBottom: 12,
+        shadowOffset: { width: 0, height: 8 },
+        shadowOpacity: 0.06,
+        shadowRadius: 16,
+        elevation: 2,
+    },
+    todoCheckButton: {
+        width: 26,
+        height: 26,
+        borderRadius: 10,
+        borderWidth: 2,
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginRight: 12,
+    },
+    todoTitle: {
+        flex: 1,
+        fontSize: 15,
+        fontWeight: '700',
+        lineHeight: 21,
+    },
+    todoDeleteButton: {
+        width: 32,
+        height: 32,
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginLeft: 8,
+    },
+    todoEditButton: {
+        width: 32,
+        height: 32,
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginLeft: 4,
+    },
+    todoEditInput: {
+        flex: 1,
+        fontSize: 15,
+        fontWeight: '700',
+        lineHeight: 21,
+        paddingVertical: 0,
+        marginRight: 8,
+    },
+    todoEditActions: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginLeft: 8,
+    },
+    todoMiniAction: {
+        width: 32,
+        height: 32,
+        borderRadius: 10,
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginLeft: 6,
+    },
     widgetsSection: {
         paddingHorizontal: 24,
         marginBottom: 26,
@@ -723,10 +863,20 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         marginBottom: 20,
     },
+    sectionHeaderTextWrap: {
+        flex: 1,
+        paddingRight: 12,
+    },
     sectionTitle: {
         fontSize: 20,
         fontWeight: '800',
         letterSpacing: -0.5,
+    },
+    sectionDescription: {
+        marginTop: 4,
+        fontSize: 12,
+        fontWeight: '600',
+        lineHeight: 17,
     },
     addSectionButton: {
         width: 32,

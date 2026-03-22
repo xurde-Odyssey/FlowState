@@ -66,7 +66,10 @@ export default function HabitsSection({
     return (
         <View style={styles.habitsSection}>
             <View style={styles.habitsHeader}>
-                <Text style={[styles.sectionTitle, { color: theme.text }]}>Daily Habits</Text>
+                <View style={styles.sectionHeaderTextWrap}>
+                    <Text style={[styles.sectionTitle, { color: theme.text }]}>Daily Habits</Text>
+                    <Text style={[styles.sectionDescription, { color: theme.subText }]}>Actions you repeat consistently</Text>
+                </View>
                 <View style={[styles.progressBadge, { backgroundColor: theme.success + '15' }]}>
                     <Text style={[styles.progressText, { color: theme.success }]}>{completedCount}/{habits.length} done</Text>
                 </View>

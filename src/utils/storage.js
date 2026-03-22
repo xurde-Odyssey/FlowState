@@ -49,16 +49,50 @@ const normalizeCompletedDates = (completedDates) => {
     return Array.from(unique).sort();
 };
 
+const getDaysBetween = (startDateStr, endDateStr) => {
+    const start = new Date(`${startDateStr}T00:00:00`);
+    const end = new Date(`${endDateStr}T00:00:00`);
+    const diffMs = end.getTime() - start.getTime();
+    return Math.round(diffMs / (1000 * 60 * 60 * 24));
+};
+
+const calculateCurrentHabitStreak = (completedDates, referenceDate = new Date().toISOString().split('T')[0]) => {
+    const normalizedDates = normalizeCompletedDates(completedDates);
+    if (normalizedDates.length === 0) {return 0;}
+
+    const lastCompletedDate = normalizedDates[normalizedDates.length - 1];
+    const gapFromReference = getDaysBetween(lastCompletedDate, referenceDate);
+
+    if (gapFromReference > 1) {
+        return 0;
+    }
+
+    let streak = 1;
+    for (let index = normalizedDates.length - 1; index > 0; index -= 1) {
+        const previousDate = normalizedDates[index - 1];
+        const currentDate = normalizedDates[index];
+        if (getDaysBetween(previousDate, currentDate) === 1) {
+            streak += 1;
+            continue;
+        }
+        break;
+    }
+
+    return streak;
+};
+
 const normalizeHabits = (habits) => {
     if (!Array.isArray(habits)) {return [];}
     return habits.map((habit, index) => ({
+        ...habit,
+        completedDates: normalizeCompletedDates(habit?.completedDates),
+    })).map((habit, index) => ({
         ...habit,
         id: `${habit?.id ?? `habit-${Date.now()}-${index}`}`,
         name: typeof habit?.name === 'string' && habit.name.trim()
             ? habit.name.trim()
             : (typeof habit?.title === 'string' && habit.title.trim() ? habit.title.trim() : 'Habit'),
-        streak: Number.isFinite(Number(habit?.streak)) ? Math.max(0, Number(habit.streak)) : 0,
-        completedDates: normalizeCompletedDates(habit?.completedDates),
+        streak: calculateCurrentHabitStreak(habit.completedDates),
     }));
 };
 
@@ -87,6 +121,17 @@ const normalizeFocusSessions = (sessions) => {
             const createdAtMs = new Date(session.createdAt).getTime();
             return Number.isFinite(createdAtMs);
         });
+};
+
+const normalizeTodoItems = (items) => {
+    if (!Array.isArray(items)) {return [];}
+    return items.map((item, index) => ({
+        ...item,
+        id: `${item?.id ?? `todo-${Date.now()}-${index}`}`,
+        title: typeof item?.title === 'string' && item.title.trim() ? item.title.trim() : 'Todo item',
+        completed: Boolean(item?.completed),
+        createdAt: toIsoDate(item?.createdAt),
+    }));
 };
 
 const normalizeSettings = (settings) => {
@@ -125,6 +170,8 @@ const normalizeSettings = (settings) => {
                 : [],
         };
     }
+
+    nextSettings.todoList = normalizeTodoItems(nextSettings.todoList);
 
     return nextSettings;
 };
@@ -226,7 +273,7 @@ export const storage = {
      */
     async addHabit(habit) {
         const habits = await this.getHabits();
-        const newHabits = [...habits, { ...habit, id: Date.now().toString(), streak: 0, completedDates: [] }];
+        const newHabits = normalizeHabits([...habits, { ...habit, id: Date.now().toString(), streak: 0, completedDates: [] }]);
         await this.saveHabits(newHabits);
         return newHabits;
     },
@@ -244,17 +291,18 @@ export const storage = {
                 const isCompleted = completedDates.includes(today);
 
                 let newCompletedDates;
-                let newStreak = habit.streak || 0;
 
                 if (isCompleted) {
                     newCompletedDates = completedDates.filter(date => date !== today);
-                    newStreak = Math.max(0, newStreak - 1);
                 } else {
                     newCompletedDates = [...completedDates, today];
-                    newStreak += 1;
                 }
 
-                return { ...habit, completedDates: newCompletedDates, streak: newStreak };
+                return {
+                    ...habit,
+                    completedDates: normalizeCompletedDates(newCompletedDates),
+                    streak: calculateCurrentHabitStreak(newCompletedDates, today),
+                };
             }
             return habit;
         });
@@ -274,20 +322,17 @@ export const storage = {
             const completedDates = Array.isArray(habit.completedDates) ? habit.completedDates : [];
             const hasDate = completedDates.includes(dateStr);
             let nextDates = completedDates;
-            let nextStreak = habit.streak || 0;
 
             if (isCompleted && !hasDate) {
                 nextDates = [...completedDates, dateStr];
-                nextStreak += 1;
             } else if (!isCompleted && hasDate) {
                 nextDates = completedDates.filter((d) => d !== dateStr);
-                nextStreak = Math.max(0, nextStreak - 1);
             }
 
             return {
                 ...habit,
-                completedDates: nextDates,
-                streak: nextStreak,
+                completedDates: normalizeCompletedDates(nextDates),
+                streak: calculateCurrentHabitStreak(nextDates, dateStr),
             };
         });
 
@@ -511,6 +556,94 @@ export const storage = {
         } catch (e) {
             console.error('Error saving onboarding status', e);
         }
+    },
+
+    /**
+     * Get all todo items stored in settings.
+     */
+    async getTodoItems() {
+        try {
+            const settings = (await this.getSettings()) || {};
+            return normalizeTodoItems(settings.todoList);
+        } catch (e) {
+            console.error('Error reading todo items', e);
+            return [];
+        }
+    },
+
+    /**
+     * Save all todo items stored in settings.
+     */
+    async saveTodoItems(todoItems) {
+        const normalized = normalizeTodoItems(todoItems);
+        try {
+            await this.updateSettings((settings = {}) => ({
+                ...settings,
+                todoList: normalized,
+            }));
+        } catch (e) {
+            console.error('Error saving todo items', e);
+        }
+        return normalized;
+    },
+
+    /**
+     * Add a todo item.
+     */
+    async addTodoItem(title) {
+        const todoItems = await this.getTodoItems();
+        const cleanedTitle = typeof title === 'string' ? title.trim() : '';
+        if (!cleanedTitle) {return todoItems;}
+
+        const nextItems = [
+            {
+                id: Date.now().toString(),
+                title: cleanedTitle,
+                completed: false,
+                createdAt: new Date().toISOString(),
+            },
+            ...todoItems,
+        ];
+        return this.saveTodoItems(nextItems);
+    },
+
+    /**
+     * Toggle a todo item completed state.
+     */
+    async toggleTodoItem(todoId) {
+        const todoItems = await this.getTodoItems();
+        const nextItems = todoItems.map((item) => (
+            item.id === todoId
+                ? { ...item, completed: !item.completed }
+                : item
+        ));
+        return this.saveTodoItems(nextItems);
+    },
+
+    /**
+     * Update a todo item.
+     */
+    async updateTodoItem(todoId, updates) {
+        const todoItems = await this.getTodoItems();
+        const nextItems = todoItems.map((item) => (
+            item.id === todoId
+                ? {
+                    ...item,
+                    ...updates,
+                    title: typeof updates?.title === 'string' && updates.title.trim() ? updates.title.trim() : item.title,
+                }
+                : item
+        ));
+        return this.saveTodoItems(nextItems);
+    },
+
+    /**
+     * Delete a todo item.
+     */
+    async deleteTodoItem(todoId) {
+        const todoItems = await this.getTodoItems();
+        const nextItems = todoItems.filter((item) => item.id !== todoId);
+        return this.saveTodoItems(nextItems);
     },
 
     /**

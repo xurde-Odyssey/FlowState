@@ -65,7 +65,10 @@ export default function ProjectsSection({
     return (
         <View style={[styles.section, isEmptyState && { marginBottom: 10 }]}>
             <View style={styles.sectionHeader}>
-                <Text style={[styles.sectionTitle, { color: theme.text }]}>Tasks to Complete</Text>
+                <View style={styles.sectionHeaderTextWrap}>
+                    <Text style={[styles.sectionTitle, { color: theme.text }]}>Projects</Text>
+                    <Text style={[styles.sectionDescription, { color: theme.subText }]}>Bigger outcomes with a deadline</Text>
+                </View>
                 <TouchableOpacity
                     onPress={() => {
                         triggerTapFeedback();
@@ -119,7 +122,7 @@ export default function ProjectsSection({
                     ]}
                     activeOpacity={0.6}
                 >
-                    <Text style={{ color: theme.subText, fontWeight: '600' }}>No tasks yet. Tap + to add one.</Text>
+                    <Text style={{ color: theme.subText, fontWeight: '600' }}>No projects yet. Tap + to add one.</Text>
                 </TouchableOpacity>
             ) : null}
 

@@ -15,6 +15,7 @@ import {
     Modal,
     Linking,
 } from 'react-native';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import { Ionicons } from '@expo/vector-icons';
 import Constants from 'expo-constants';
 import { useTheme } from '../../context/ThemeContext';
@@ -63,6 +64,17 @@ const ABOUT_SECTIONS = [
     },
 ];
 
+const createReminderDate = (hour = 9, minute = 0) => {
+    const date = new Date();
+    date.setHours(hour, minute, 0, 0);
+    return date;
+};
+
+const formatReminderTime = (date) => date.toLocaleTimeString([], {
+    hour: 'numeric',
+    minute: '2-digit',
+});
+
 export default function SettingsScreen() {
     const { theme, isDark, toggleTheme } = useTheme();
     const { userData, updateName, updateAvatar, avatarOptions, reloadUser } = useUser();
@@ -81,6 +93,8 @@ export default function SettingsScreen() {
     const [profileSaveState, setProfileSaveState] = useState('idle');
     const [themeSaveState, setThemeSaveState] = useState('idle');
     const [autoLaunchReminderEnabled, setAutoLaunchReminderEnabled] = useState(false);
+    const [reminderTime, setReminderTime] = useState(createReminderDate());
+    const [showReminderTimePicker, setShowReminderTimePicker] = useState(false);
     const [reminderSaveState, setReminderSaveState] = useState('idle');
     const exportInputRef = useRef(null);
     const profileSaveTimerRef = useRef(null);
@@ -129,12 +143,16 @@ export default function SettingsScreen() {
             try {
                 const settings = await storage.getSettings();
                 const enabled = Boolean(settings?.reminderSettings?.autoLaunchEnabled);
+                const hour = settings?.reminderSettings?.autoLaunchHour ?? 9;
+                const minute = settings?.reminderSettings?.autoLaunchMinute ?? 0;
                 if (active) {
                     setAutoLaunchReminderEnabled(enabled);
+                    setReminderTime(createReminderDate(hour, minute));
                 }
             } catch {
                 if (active) {
                     setAutoLaunchReminderEnabled(false);
+                    setReminderTime(createReminderDate());
                 }
             }
         };
@@ -200,6 +218,8 @@ export default function SettingsScreen() {
         if (reminderSaveState === 'saving') {return;}
         try {
             setReminderSaveState('saving');
+            const hour = reminderTime.getHours();
+            const minute = reminderTime.getMinutes();
 
             if (value) {
                 const granted = await NotificationService.requestPermissions();
@@ -217,15 +237,54 @@ export default function SettingsScreen() {
                 reminderSettings: {
                     ...(settings.reminderSettings || {}),
                     autoLaunchEnabled: value,
-                    autoLaunchHour: 9,
-                    autoLaunchMinute: 0,
+                    autoLaunchHour: hour,
+                    autoLaunchMinute: minute,
                 },
             }));
 
             await NotificationService.syncAutoLaunchReminder({
                 enabled: value,
-                hour: 9,
-                minute: 0,
+                hour,
+                minute,
+            });
+
+            queueSavedState(setReminderSaveState, reminderSaveTimerRef);
+        } catch (error) {
+            setReminderSaveState('error');
+        }
+    };
+
+    const handleReminderTimeChange = async (_, selectedDate) => {
+        if (!selectedDate) {
+            if (Platform.OS === 'android') {
+                setShowReminderTimePicker(false);
+            }
+            return;
+        }
+
+        const nextTime = createReminderDate(selectedDate.getHours(), selectedDate.getMinutes());
+        setReminderTime(nextTime);
+
+        if (Platform.OS === 'android') {
+            setShowReminderTimePicker(false);
+        }
+
+        try {
+            setReminderSaveState('saving');
+            await storage.updateSettings((settings = {}) => ({
+                ...settings,
+                reminderSettings: {
+                    ...(settings.reminderSettings || {}),
+                    autoLaunchEnabled: Boolean(settings?.reminderSettings?.autoLaunchEnabled),
+                    autoLaunchHour: nextTime.getHours(),
+                    autoLaunchMinute: nextTime.getMinutes(),
+                },
+            }));
+
+            await NotificationService.syncAutoLaunchReminder({
+                enabled: autoLaunchReminderEnabled,
+                hour: nextTime.getHours(),
+                minute: nextTime.getMinutes(),
             });
 
             queueSavedState(setReminderSaveState, reminderSaveTimerRef);
@@ -295,8 +354,8 @@ export default function SettingsScreen() {
         >
             <ScrollView contentContainerStyle={[styles.content, isWide && styles.contentWide]} showsVerticalScrollIndicator={false}>
                 <View style={styles.headerArea}>
-                    <Text style={[styles.title, { color: theme.text }]}>Manage Account</Text>
-                    <Text style={[styles.subtitle, { color: theme.subText }]}>App</Text>
+                    <Text style={[styles.title, { color: theme.text }]}>Settings</Text>
+                    <Text style={[styles.subtitle, { color: theme.subText }]}>Daily controls first, advanced tools below</Text>
                 </View>
 
                 <View style={[styles.profileHero, { backgroundColor: theme.card, borderColor: theme.border }]}> 
@@ -314,6 +373,138 @@ export default function SettingsScreen() {
                     <View style={[styles.modePill, { backgroundColor: theme.input, borderColor: theme.border }]}> 
                         <Text style={[styles.modePillText, { color: theme.text }]}>{isDark ? 'Dark' : 'Light'}</Text>
                     </View>
+                </View>
+
+                <View style={styles.groupHeader}>
+                    <Text style={[styles.groupLabel, { color: theme.text }]}>Daily Use</Text>
+                    <Text style={[styles.groupHint, { color: theme.subText }]}>Things you may adjust often</Text>
+                </View>
+
+                <View style={[styles.sectionCard, { backgroundColor: theme.card, borderColor: theme.border }]}> 
+                    <Text style={[styles.sectionTitle, { color: theme.text }]}>Appearance</Text>
+                    <View style={[styles.infoRowBox, { backgroundColor: theme.input, borderColor: theme.border }]}> 
+                        <View style={styles.settingLeft}>
+                            <View style={[styles.settingIcon, { backgroundColor: theme.background }]}> 
+                                <Ionicons name={isDark ? 'moon' : 'sunny'} size={18} color={theme.primary} />
+                            </View>
+                            <View>
+                                <Text style={[styles.settingTitle, { color: theme.text }]}>Theme Mode</Text>
+                                <Text style={[styles.settingSub, { color: theme.subText }]}>{isDark ? 'Dark mode enabled' : 'Light mode enabled'}</Text>
+                            </View>
+                        </View>
+                        <Switch
+                            trackColor={{ false: '#94A3B8', true: theme.primary }}
+                            thumbColor={Platform.OS === 'ios' ? '#FFFFFF' : '#F8FAFC'}
+                            ios_backgroundColor="#64748B"
+                            onValueChange={handleToggleTheme}
+                            value={isDark}
+                            disabled={themeSaveState === 'saving'}
+                        />
+                    </View>
+                    {themeSaveState !== 'idle' ? (
+                        <Text
+                            style={[
+                                styles.inlineSaveText,
+                                {
+                                    color: themeSaveState === 'error'
+                                        ? theme.danger
+                                        : (themeSaveState === 'saved' ? theme.success : theme.subText),
+                                },
+                            ]}
+                        >
+                            {themeSaveState === 'saving'
+                                ? 'Saving theme...'
+                                : (themeSaveState === 'saved' ? 'Theme saved' : 'Could not save theme')}
+                        </Text>
+                    ) : null}
+                </View>
+
+                <View style={[styles.sectionCard, { backgroundColor: theme.card, borderColor: theme.border }]}> 
+                    <Text style={[styles.sectionTitle, { color: theme.text }]}>Smart Reminder</Text>
+                    <View style={[styles.infoRowBox, { backgroundColor: theme.input, borderColor: theme.border }]}>
+                        <View style={styles.settingLeft}>
+                            <View style={[styles.settingIcon, { backgroundColor: theme.background }]}>
+                                <Ionicons name="alarm-outline" size={18} color={theme.primary} />
+                            </View>
+                            <View>
+                                <Text style={[styles.settingTitle, { color: theme.text }]}>Auto Launch Reminder</Text>
+                                <Text style={[styles.settingSub, { color: theme.subText }]}>
+                                    Daily reminder at 9:00 AM
+                                </Text>
+                            </View>
+                        </View>
+                        <Switch
+                            trackColor={{ false: '#94A3B8', true: theme.primary }}
+                            thumbColor={Platform.OS === 'ios' ? '#FFFFFF' : '#F8FAFC'}
+                            ios_backgroundColor="#64748B"
+                            onValueChange={handleToggleAutoLaunchReminder}
+                            value={autoLaunchReminderEnabled}
+                            disabled={reminderSaveState === 'saving'}
+                        />
+                    </View>
+                    <TouchableOpacity
+                        style={[styles.reminderTimeButton, { backgroundColor: theme.input, borderColor: theme.border }]}
+                        activeOpacity={0.85}
+                        onPress={() => setShowReminderTimePicker((prev) => !prev)}
+                    >
+                        <View style={styles.settingLeft}>
+                            <View style={[styles.settingIcon, { backgroundColor: theme.background }]}>
+                                <Ionicons name="time-outline" size={18} color={theme.primary} />
+                            </View>
+                            <View>
+                                <Text style={[styles.settingTitle, { color: theme.text }]}>Reminder Time</Text>
+                                <Text style={[styles.settingSub, { color: theme.subText }]}>
+                                    {formatReminderTime(reminderTime)}
+                                </Text>
+                            </View>
+                        </View>
+                        <Ionicons
+                            name={showReminderTimePicker ? 'chevron-up' : 'chevron-down'}
+                            size={18}
+                            color={theme.subText}
+                        />
+                    </TouchableOpacity>
+
+                    {showReminderTimePicker ? (
+                        <View style={[styles.reminderPickerWrap, { backgroundColor: theme.input, borderColor: theme.border }]}>
+                            <DateTimePicker
+                                value={reminderTime}
+                                mode="time"
+                                display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                                onChange={handleReminderTimeChange}
+                            />
+                            {Platform.OS === 'ios' ? (
+                                <TouchableOpacity
+                                    style={[styles.reminderPickerDone, { backgroundColor: theme.primary }]}
+                                    onPress={() => setShowReminderTimePicker(false)}
+                                    activeOpacity={0.85}
+                                >
+                                    <Text style={styles.reminderPickerDoneText}>Done</Text>
+                                </TouchableOpacity>
+                            ) : null}
+                        </View>
+                    ) : null}
+                    {reminderSaveState !== 'idle' ? (
+                        <Text
+                            style={[
+                                styles.inlineSaveText,
+                                {
+                                    color: reminderSaveState === 'error'
+                                        ? theme.danger
+                                        : (reminderSaveState === 'saved' ? theme.success : theme.subText),
+                                },
+                            ]}
+                        >
+                            {reminderSaveState === 'saving'
+                                ? 'Saving reminder...'
+                                : (reminderSaveState === 'saved' ? 'Reminder updated' : 'Could not update reminder')}
+                        </Text>
+                    ) : null}
+                </View>
+
+                <View style={styles.groupHeader}>
+                    <Text style={[styles.groupLabel, { color: theme.text }]}>Account</Text>
+                    <Text style={[styles.groupHint, { color: theme.subText }]}>Identity and personal profile</Text>
                 </View>
 
                 <View style={[styles.sectionCard, { backgroundColor: theme.card, borderColor: theme.border }]}> 
@@ -406,84 +597,9 @@ export default function SettingsScreen() {
                     ) : null}
                 </View>
 
-                <View style={[styles.sectionCard, { backgroundColor: theme.card, borderColor: theme.border }]}> 
-                    <Text style={[styles.sectionTitle, { color: theme.text }]}>Appearance</Text>
-                    <View style={[styles.infoRowBox, { backgroundColor: theme.input, borderColor: theme.border }]}> 
-                        <View style={styles.settingLeft}>
-                            <View style={[styles.settingIcon, { backgroundColor: theme.background }]}> 
-                                <Ionicons name={isDark ? 'moon' : 'sunny'} size={18} color={theme.primary} />
-                            </View>
-                            <View>
-                                <Text style={[styles.settingTitle, { color: theme.text }]}>Theme Mode</Text>
-                                <Text style={[styles.settingSub, { color: theme.subText }]}>{isDark ? 'Dark mode enabled' : 'Light mode enabled'}</Text>
-                            </View>
-                        </View>
-                        <Switch
-                            trackColor={{ false: '#94A3B8', true: theme.primary }}
-                            thumbColor={Platform.OS === 'ios' ? '#FFFFFF' : '#F8FAFC'}
-                            ios_backgroundColor="#64748B"
-                            onValueChange={handleToggleTheme}
-                            value={isDark}
-                            disabled={themeSaveState === 'saving'}
-                        />
-                    </View>
-                    {themeSaveState !== 'idle' ? (
-                        <Text
-                            style={[
-                                styles.inlineSaveText,
-                                {
-                                    color: themeSaveState === 'error'
-                                        ? theme.danger
-                                        : (themeSaveState === 'saved' ? theme.success : theme.subText),
-                                },
-                            ]}
-                        >
-                            {themeSaveState === 'saving'
-                                ? 'Saving theme...'
-                                : (themeSaveState === 'saved' ? 'Theme saved' : 'Could not save theme')}
-                        </Text>
-                    ) : null}
-                </View>
-
-                <View style={[styles.sectionCard, { backgroundColor: theme.card, borderColor: theme.border }]}> 
-                    <Text style={[styles.sectionTitle, { color: theme.text }]}>Smart Reminder</Text>
-                    <View style={[styles.infoRowBox, { backgroundColor: theme.input, borderColor: theme.border }]}>
-                        <View style={styles.settingLeft}>
-                            <View style={[styles.settingIcon, { backgroundColor: theme.background }]}>
-                                <Ionicons name="alarm-outline" size={18} color={theme.primary} />
-                            </View>
-                            <View>
-                                <Text style={[styles.settingTitle, { color: theme.text }]}>Auto Launch Reminder</Text>
-                                <Text style={[styles.settingSub, { color: theme.subText }]}>
-                                    Daily reminder at 9:00 AM
-                                </Text>
-                            </View>
-                        </View>
-                        <Switch
-                            trackColor={{ false: '#94A3B8', true: theme.primary }}
-                            thumbColor={Platform.OS === 'ios' ? '#FFFFFF' : '#F8FAFC'}
-                            ios_backgroundColor="#64748B"
-                            onValueChange={handleToggleAutoLaunchReminder}
-                            value={autoLaunchReminderEnabled}
-                            disabled={reminderSaveState === 'saving'}
-                        />
-                    </View>
-                    {reminderSaveState !== 'idle' ? (
-                        <Text
-                            style={[
-                                styles.inlineSaveText,
-                                {
-                                    color: reminderSaveState === 'error'
-                                        ? theme.danger
-                                        : (reminderSaveState === 'saved' ? theme.success : theme.subText),
-                                },
-                            ]}
-                        >
-                            {reminderSaveState === 'saving'
-                                ? 'Saving reminder...'
-                                : (reminderSaveState === 'saved' ? 'Reminder updated' : 'Could not update reminder')}
-                        </Text>
-                    ) : null}
+                <View style={styles.groupHeader}>
+                    <Text style={[styles.groupLabel, { color: theme.text }]}>Data & Advanced</Text>
+                    <Text style={[styles.groupHint, { color: theme.subText }]}>Maintenance, transfer, and recovery tools</Text>
                 </View>
 
                 <View style={[styles.sectionCard, { backgroundColor: theme.card, borderColor: theme.border }]}> 
@@ -511,6 +627,11 @@ export default function SettingsScreen() {
                             <Text style={[styles.backupButtonText, { color: theme.text }]}>Import Session</Text>
                         </TouchableOpacity>
                     </View>
+                </View>
+
+                <View style={styles.groupHeader}>
+                    <Text style={[styles.groupLabel, { color: theme.text }]}>About</Text>
+                    <Text style={[styles.groupHint, { color: theme.subText }]}>Version, developer, and product context</Text>
                 </View>
 
                 <View style={[styles.sectionCard, { backgroundColor: theme.card, borderColor: theme.border }]}> 
@@ -669,6 +790,23 @@ const styles = StyleSheet.create({
     },
     headerArea: {
         marginBottom: 14,
+    },
+    groupHeader: {
+        marginTop: 6,
+        marginBottom: 8,
+        paddingHorizontal: 2,
+    },
+    groupLabel: {
+        fontSize: 12,
+        fontWeight: '800',
+        textTransform: 'uppercase',
+        letterSpacing: 0.8,
+    },
+    groupHint: {
+        marginTop: 3,
+        fontSize: 12,
+        fontWeight: '500',
+        lineHeight: 17,
     },
     title: {
         fontSize: 32,
@@ -838,6 +976,37 @@ const styles = StyleSheet.create({
         marginTop: 10,
         fontSize: 12,
         fontWeight: '700',
+    },
+    reminderTimeButton: {
+        marginTop: 10,
+        borderWidth: 1,
+        borderRadius: 12,
+        paddingHorizontal: 10,
+        paddingVertical: 10,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+    },
+    reminderPickerWrap: {
+        marginTop: 10,
+        borderWidth: 1,
+        borderRadius: 12,
+        paddingTop: 8,
+        paddingBottom: 12,
+        overflow: 'hidden',
+    },
+    reminderPickerDone: {
+        alignSelf: 'flex-end',
+        marginTop: 6,
+        marginRight: 12,
+        borderRadius: 10,
+        paddingHorizontal: 14,
+        paddingVertical: 8,
+    },
+    reminderPickerDoneText: {
+        color: '#FFFFFF',
+        fontSize: 13,
+        fontWeight: '800',
     },
     backupButtonsRow: {
         flexDirection: 'row',
